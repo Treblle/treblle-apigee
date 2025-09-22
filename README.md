@@ -18,7 +18,7 @@ This implementation is designed to be non-blocking. It collects data during the 
 
 ## Components
 
-1.  **`treblle-apigee-policy-mvp.js`**: A JavaScript policy that:
+1.  **`treblle-apigee-policy.js`**: A JavaScript policy that:
     - Collects request, response, server, and error data.
     - Formats the data into the JSON payload expected by the Treblle API.
     - Stores the payload and required HTTP headers into Apigee context variables.
@@ -57,7 +57,7 @@ To ensure the policy captures the full request and response cycle without adding
     - Go to the `Develop` tab of your API proxy.
     - Select the **PreFlow** of the **Proxy Endpoint** section.
     - Add a new **JavaScript** policy to the **Response** flow.
-    - Select the `treblle-apigee-policy-mvp.js` script you uploaded.
+    - Select the `treblle-apigee-policy.js` script you uploaded.
 
 2.  **Attach the Service Callout Policy**:
     - Go to the `Develop` tab of your API proxy.
@@ -85,4 +85,5 @@ Proxy Endpoint (Response Flow)
 ### 4. Save and Deploy
 
 Save the changes to your API proxy and deploy the new revision. Your API traffic will now be monitored by Treblle.
+
 
