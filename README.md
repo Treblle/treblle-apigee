@@ -33,7 +33,7 @@ Follow these steps to integrate the Treblle policy into your Apigee API proxy:
 
 ### 1. Configure the JavaScript Policy
 
-Open the `treblle-apigee-policy-mvp.js` file and update the configuration variables at the top:
+Open the `treblle-apigee-policy.js` file and update the configuration variables at the top:
 
 ```javascript
 // ==================== CONFIGURATION ====================
@@ -46,7 +46,7 @@ Replace `'YOUR_API_KEY_HERE'` and `'YOUR_PROJECT_ID_HERE'` with your actual Treb
 
 ### 2. Upload Policies to Apigee
 
-1.  Upload the `treblle-apigee-policy-mvp.js` file as a new JavaScript resource in your Apigee environment.
+1.  Upload the `treblle-apigee-policy.js` file as a new JavaScript resource in your Apigee environment.
 2.  Create a new Service Callout policy in your API proxy and paste the content of `callout.xml` into it. Name the policy `SC-callout`.
 
 ### 3. Attach Policies to the Proxy Flow
@@ -71,7 +71,7 @@ Proxy Endpoint (Response Flow)
 |
 |--> Preflow
 |    |
-|    '--> [JS] treblle-apigee-policy-mvp.js
+|    '--> [JS] treblle-apigee-policy.js
 |
 |--> (Conditional Flows)
 |
@@ -85,3 +85,4 @@ Proxy Endpoint (Response Flow)
 ### 4. Save and Deploy
 
 Save the changes to your API proxy and deploy the new revision. Your API traffic will now be monitored by Treblle.
+
