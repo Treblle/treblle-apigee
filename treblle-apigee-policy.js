@@ -256,7 +256,7 @@ function generateErrors(responseBody, statusCode) {
     }
 
     // If no Apigee fault but HTTP error status, create HTTP error
-    if (true) {
+    if (statusCode >= 400) {
         var errorMessage = 'HTTP Error ' + statusCode;
 
         // Extract error message from response body
@@ -413,7 +413,7 @@ function buildTrebllePayload() {
 }
 
 // ==================== MAIN LOGIC ====================
-// Main Logic: Prepare and Send Event to Treblle (Following Moesif pattern)
+// Main Logic: Prepare and Send Event to Treblle
 
 if (!apiKey || apiKey === 'fixme') {
     // API key not configured
