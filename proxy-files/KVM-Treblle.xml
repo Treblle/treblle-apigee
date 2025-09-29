@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<KeyValueMapOperations mapIdentifier="{YOUR_KVM_NAME}" continueOnError="false" enabled="true"
+    name="KVM-Treblle">
+    <DisplayName>KVM-Treblle</DisplayName>
+    <Properties />
+    <ExclusiveCache>false</ExclusiveCache>
+    <ExpiryTimeInSecs>300</ExpiryTimeInSecs>
+    <Get assignTo="treblle_api_key">
+        <Key>
+            <Parameter>treblle_api_key</Parameter>
+        </Key>
+    </Get>
+    <Get assignTo="treblle_project_id">
+        <Key>
+            <Parameter>treblle_project_id</Parameter>
+        </Key>
+    </Get>
+    <Scope>environment</Scope>
+</KeyValueMapOperations>

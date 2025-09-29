@@ -3,14 +3,15 @@
  */
 
 // ==================== CONFIGURATION ====================
-var apiKey = 'YOUR_API_KEY_HERE'; // Replace with your Treblle API key
-var projectId = 'YOUR_PROJECT_ID_HERE'; // Replace with your Treblle project ID
-var baseUri = 'https://rocknrolla.treblle.com';
+var apiKey = context.getVariable('treblle_api_key'); // Read from KVM
+var projectId = context.getVariable('treblle_project_id'); // Read from KVM
+var maskingKeywords = "password,pwd,secret,password_confirmation,cc,card_number,ccv,ssn,credit_score";
+
 var debug = properties.debug || false;
 var logBody = properties.logBody || true;
 var version = 0.6;
 var sdkName = 'apigee';
-var internal_id = context.getVariable('apiproxy.name') || 'mockapi-demo';
+var internal_id = context.getVariable('apiproxy.name') || 'fixme';
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -52,6 +53,39 @@ function safeParseInt(value, defaultValue) {
     if (!isValid(value)) return defaultValue || 0;
     var parsed = parseInt(value);
     return isNaN(parsed) ? (defaultValue || 0) : parsed;
+}
+
+/**
+ * Masks sensitive data in objects based on masking keywords
+ */
+function maskSensitiveData(obj, keywords) {
+    if (!obj || typeof obj !== 'object' || !keywords) {
+        return obj;
+    }
+
+    var keywordList = keywords.split(',').map(function (k) { return k.trim().toLowerCase(); });
+
+    function maskObject(o) {
+        if (Array.isArray(o)) {
+            return o.map(maskObject);
+        } else if (o !== null && typeof o === 'object') {
+            var masked = {};
+            for (var key in o) {
+                if (o.hasOwnProperty(key)) {
+                    var lowerKey = key.toLowerCase();
+                    if (keywordList.indexOf(lowerKey) > -1) {
+                        masked[key] = '*****';
+                    } else {
+                        masked[key] = maskObject(o[key]);
+                    }
+                }
+            }
+            return masked;
+        }
+        return o;
+    }
+
+    return maskObject(obj);
 }
 
 // ==================== HEADER FUNCTIONS ====================
@@ -302,8 +336,10 @@ function parseBody(content, headers) {
 
     if (logBody && isJSON) {
         try {
+            var parsedBody = JSON.parse(content);
+            var maskedBody = maskSensitiveData(parsedBody, maskingKeywords);
             return {
-                body: JSON.parse(content),
+                body: maskedBody,
                 transferEncoding: undefined
             };
         } catch (e) {
@@ -333,7 +369,7 @@ function getRequestData() {
     return {
         timestamp: '', // Will be set by getTimestamps()
         ip: getClientIP(),
-        url: (req.scheme || 'https') + '://' + (getHeader(headers, 'X-Forwarded-Host') || 'apigee.com'),
+        url: context.getVariable('proxy.url'),
         user_agent: getHeader(headers, 'User-Agent') || 'Unknown',
         method: (req.method || 'GET').toUpperCase(),
         headers: getAllHeaders(headers),
@@ -463,6 +499,32 @@ try {
     var verifyContentType = context.getVariable('treblle_content_type');
     var verifyApiKey = context.getVariable('treblle_x_api_key');
     var verifyUserAgent = context.getVariable('treblle_user_agent');
+
+    // Define Treblle hosts
+    var treblleHosts = [
+        'rocknrolla.treblle.com',
+        'punisher.treblle.com',
+        'sicario.treblle.com'
+    ];
+
+    // Shuffle the array to randomize the order (ES5 compliant)
+    var i = treblleHosts.length; // Use var for loop variable
+    while (i > 0) {
+        var j = Math.floor(Math.random() * i); // Use var
+        i--;
+        // Swap elements (ES5 compliant - no destructuring)
+        var temp = treblleHosts[i]; // Use var
+        treblleHosts[i] = treblleHosts[j];
+        treblleHosts[j] = temp;
+    }
+
+    // Pick the first two unique hosts from the shuffled list
+    var primaryHost = treblleHosts[0];
+    var fallbackHost = treblleHosts[1];
+
+    // Set the hosts into context variables for the ServiceCallout policies in shared flow
+    context.setVariable('treblle.primary.host', primaryHost);
+    context.setVariable('treblle.fallback.host', fallbackHost);
 
 } catch (error) {
     // Catch any synchronous errors in the main flow
