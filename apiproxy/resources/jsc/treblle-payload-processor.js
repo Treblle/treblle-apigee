@@ -3,43 +3,35 @@
  */
 
 // ==================== CONFIGURATION ====================
-var sdkToken = context.getVariable("treblle.sdk.token");
-var apiKey = context.getVariable("treblle.api.key");
+var sdkToken = context.getVariable('treblle.sdk.token');
+var apiKey = context.getVariable('treblle.api.key');
 // Default sensitive fields - always masked regardless of user configuration
-var defaultMaskingKeywords =
-  "password,pwd,secret,password_confirmation,passwordConfirmation,cc,card_number,cardNumber,ccv,ssn,credit_score,creditScore";
+var defaultMaskingKeywords = "password,pwd,secret,password_confirmation,passwordConfirmation,cc,card_number,cardNumber,ccv,ssn,credit_score,creditScore";
 
 // Endpoint blocking configuration - comma-separated list of paths to exclude
+var blockedEndpoints = properties.blockedEndpoints || "health,status,ping,admin/*,internal/*";
+
+var debug = properties.debug || false;
+var logBody = properties.logBody || true;
+var version = 20;
+var sdkName = 'apigee';
+var internal_id = context.getVariable('apiproxy.name') || '';
+var maxPayloadSize = 2097152; // 2MB in bytes
+
+// Cache static arrays for performance - convert to lowercase for case-insensitive matching
+var maskingKeywordsList = defaultMaskingKeywords.split(',').map(function (k) { return k.trim().toLowerCase(); });
 var blockedEndpoints = properties.blockedEndpoints;
 if (!blockedEndpoints || typeof blockedEndpoints !== "string") {
   blockedEndpoints = "health,status,ping,admin/*,internal/*";
 }
-var debug = properties.debug || false;
-var logBody = properties.logBody || true;
-var version = 20;
-var sdkName = "apigee";
-var internal_id = context.getVariable("apiproxy.name") || "";
-var maxPayloadSize = 2097152; // 2MB in bytes
-
-// Cache static arrays for performance - convert to lowercase for case-insensitive matching
-var maskingKeywordsList = defaultMaskingKeywords.split(",").map(function (k) {
-  return k.trim().toLowerCase();
-});
-var blockedEndpointsList = blockedEndpoints.split(",").map(function (k) {
-  return k.trim();
-});
-var treblleHosts = [
-  "rocknrolla.treblle.com",
-  "punisher.treblle.com",
-  "sicario.treblle.com",
-];
+var treblleHosts = ['rocknrolla.treblle.com', 'punisher.treblle.com', 'sicario.treblle.com'];
 
 // Cache context variables to reduce lookups
-var cachedClientIP = context.getVariable("client.ip");
-var cachedProxyURL = context.getVariable("proxy.url");
-var cachedPathSuffix = context.getVariable("proxy.pathsuffix");
-var cachedClientScheme = context.getVariable("client.scheme");
-var cachedSystemIP = context.getVariable("system.interface.eth0");
+var cachedClientIP = context.getVariable('client.ip');
+var cachedProxyURL = context.getVariable('proxy.url');
+var cachedPathSuffix = context.getVariable('proxy.pathsuffix');
+var cachedClientScheme = context.getVariable('client.scheme');
+var cachedSystemIP = context.getVariable('system.interface.eth0');
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -47,11 +39,11 @@ var cachedSystemIP = context.getVariable("system.interface.eth0");
  * Unified logging function for Treblle SDK
  */
 function log(level, message, error) {
-  if (debug || level === "ERROR") {
+  if (debug || level === 'ERROR') {
     var timestamp = new Date().toISOString();
-    var logEntry = "[" + timestamp + "] TREBLLE-" + level + ": " + message;
+    var logEntry = '[' + timestamp + '] TREBLLE-' + level + ': ' + message;
     if (error && error.message) {
-      logEntry += " | Error: " + error.message;
+      logEntry += ' | Error: ' + error.message;
     }
     print(logEntry);
   }
@@ -62,10 +54,7 @@ function log(level, message, error) {
  */
 function isPayloadOversized(content) {
   if (!content) return false;
-  var contentSize =
-    typeof content === "string"
-      ? content.length
-      : JSON.stringify(content).length;
+  var contentSize = (typeof content === 'string') ? content.length : JSON.stringify(content).length;
   return contentSize > maxPayloadSize;
 }
 
@@ -77,24 +66,21 @@ function isEndpointBlocked(path) {
   if (!path) return false;
 
   // Normalize path - remove leading slash and convert to lowercase
-  var normalizedPath = path.replace(/^\/+/, "").toLowerCase();
+  var normalizedPath = path.replace(/^\/+/, '').toLowerCase();
 
   for (var i = 0; i < blockedEndpointsList.length; i++) {
     var blockedPattern = blockedEndpointsList[i].toLowerCase();
 
     // Handle wildcard patterns
-    if (blockedPattern.indexOf("*") > -1) {
+    if (blockedPattern.indexOf('*') > -1) {
       // Convert wildcard pattern to regex-like matching
-      var patternPrefix = blockedPattern.replace("*", "");
+      var patternPrefix = blockedPattern.replace('*', '');
       if (normalizedPath.indexOf(patternPrefix) === 0) {
         return true; // Path starts with the pattern prefix
       }
     } else {
       // Exact match
-      if (
-        normalizedPath === blockedPattern ||
-        normalizedPath.indexOf(blockedPattern + "/") === 0
-      ) {
+      if (normalizedPath === blockedPattern || normalizedPath.indexOf(blockedPattern + '/') === 0) {
         return true;
       }
     }
@@ -103,14 +89,15 @@ function isEndpointBlocked(path) {
   return false;
 }
 
+
+
 /**
  * Safe number parsing with default fallback
  */
 function safeParseInt(value, defaultValue) {
-  if (!value || value === null || value === undefined || value === "")
-    return defaultValue || 0;
+  if (!value || value === null || value === undefined || value === '') return defaultValue || 0;
   var parsed = parseInt(value);
-  return isNaN(parsed) ? defaultValue || 0 : parsed;
+  return isNaN(parsed) ? (defaultValue || 0) : parsed;
 }
 
 /**
@@ -118,12 +105,12 @@ function safeParseInt(value, defaultValue) {
  * Memory-optimized implementation for performance
  */
 function maskSensitiveData(obj) {
-  if (!obj || typeof obj !== "object") {
+  if (!obj || typeof obj !== 'object') {
     return obj;
   }
 
   function maskValue(value) {
-    if (value === null || value === undefined || value === "") {
+    if (value === null || value === undefined || value === '') {
       return value; // Skip null, undefined, empty values
     }
 
@@ -132,13 +119,13 @@ function maskSensitiveData(obj) {
 
     // Memory-optimized: use Array.join for better performance on large strings
     if (maskedLength > 50) {
-      var maskArray = new Array(maskedLength + 1).join("*");
+      var maskArray = new Array(maskedLength + 1).join('*');
       return maskArray;
     } else {
       // For small strings, simple concatenation is faster
-      var masked = "";
+      var masked = '';
       for (var i = 0; i < maskedLength; i++) {
-        masked += "*";
+        masked += '*';
       }
       return masked;
     }
@@ -152,7 +139,7 @@ function maskSensitiveData(obj) {
         maskedArray[i] = maskObject(o[i]);
       }
       return maskedArray;
-    } else if (o !== null && typeof o === "object") {
+    } else if (o !== null && typeof o === 'object') {
       // Mask object values but preserve keys
       var masked = {};
       for (var key in o) {
@@ -185,7 +172,7 @@ function getHeader(headersObject, headerName) {
 
   var headerValue = headersObject[headerName];
   if (Array.isArray(headerValue)) {
-    return headerValue.length > 0 ? headerValue.join(",") : undefined;
+    return headerValue.length > 0 ? headerValue.join(',') : undefined;
   }
 
   return headerValue;
@@ -239,6 +226,7 @@ function getAllHeaders(headersObject) {
 
 // ==================== TIME FUNCTIONS ====================
 
+
 /**
  * Formats date for Treblle timestamp (yyyy-MM-dd HH:mm:ss) in UTC
  */
@@ -248,15 +236,13 @@ function formatTreblleTimestamp(date) {
   }
 
   var year = date.getUTCFullYear();
-  var month = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  var day = date.getUTCDate().toString().padStart(2, "0");
-  var hours = date.getUTCHours().toString().padStart(2, "0");
-  var minutes = date.getUTCMinutes().toString().padStart(2, "0");
-  var seconds = date.getUTCSeconds().toString().padStart(2, "0");
+  var month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  var day = date.getUTCDate().toString().padStart(2, '0');
+  var hours = date.getUTCHours().toString().padStart(2, '0');
+  var minutes = date.getUTCMinutes().toString().padStart(2, '0');
+  var seconds = date.getUTCSeconds().toString().padStart(2, '0');
 
-  return (
-    year + "-" + month + "-" + day + " " + hours + ":" + minutes + ":" + seconds
-  );
+  return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
 }
 
 /**
@@ -274,43 +260,40 @@ function calculateLoadTime(startTime, endTime) {
  */
 function getTimestamps() {
   var now = new Date();
-  var requestStartTimeMillis = context.getVariable(
-    "client.received.start.timestamp",
-  );
-  var requestStartTime = requestStartTimeMillis
-    ? new Date(safeParseInt(requestStartTimeMillis))
-    : now;
+  var requestStartTimeMillis = context.getVariable('client.received.start.timestamp');
+  var requestStartTime = requestStartTimeMillis ? new Date(safeParseInt(requestStartTimeMillis)) : now;
 
   return {
     requestTime: requestStartTime,
     responseTime: now,
     requestTimestamp: formatTreblleTimestamp(requestStartTime),
     responseTimestamp: formatTreblleTimestamp(now),
-    loadTime: calculateLoadTime(requestStartTime, now),
+    loadTime: calculateLoadTime(requestStartTime, now)
   };
 }
 
 // ==================== SYSTEM INFO FUNCTIONS ====================
 
+
+
 /**
  * Gets validated client IP
  */
 function getClientIP() {
-  var req = typeof request !== "undefined" && request ? request : {};
+  var req = (typeof request !== 'undefined' && request) ? request : {};
   var headers = req.headers || {};
 
-  var clientIP =
-    getHeader(headers, "X-Forwarded-For") ||
-    getHeader(headers, "X-Real-IP") ||
-    getHeader(headers, "X-Client-IP") ||
+  var clientIP = getHeader(headers, 'X-Forwarded-For') ||
+    getHeader(headers, 'X-Real-IP') ||
+    getHeader(headers, 'X-Client-IP') ||
     cachedClientIP;
 
   // Handle comma-separated IPs (take first one)
-  if (clientIP && clientIP.indexOf(",") > -1) {
-    clientIP = clientIP.split(",")[0].trim();
+  if (clientIP && clientIP.indexOf(',') > -1) {
+    clientIP = clientIP.split(',')[0].trim();
   }
 
-  return clientIP || "bogon";
+  return clientIP || 'bogon';
 }
 
 // ==================== ERROR HANDLING FUNCTIONS ====================
@@ -332,11 +315,7 @@ function generateErrors(responseBody, statusCode) {
     var errorState = context.getVariable("error.state");
 
     // Build comprehensive error message from available fault information
-    var message =
-      errorMessage ||
-      errorContent ||
-      faultReason ||
-      "An Apigee policy error occurred";
+    var message = errorMessage || errorContent || faultReason || "An Apigee policy error occurred";
 
     // Use fault name as error type
     var errorType = faultName;
@@ -346,12 +325,9 @@ function generateErrors(responseBody, statusCode) {
     var source = "onError"; // Default for Apigee policy errors
 
     // For certain fault types, we might classify as exceptions
-    if (
-      faultName &&
-      (faultName.indexOf("Exception") > -1 ||
-        faultName.indexOf("Timeout") > -1 ||
-        faultName.indexOf("Connection") > -1)
-    ) {
+    if (faultName && (faultName.indexOf('Exception') > -1 ||
+      faultName.indexOf('Timeout') > -1 ||
+      faultName.indexOf('Connection') > -1)) {
       source = "onException";
     }
 
@@ -370,7 +346,7 @@ function generateErrors(responseBody, statusCode) {
       type: errorType,
       message: message,
       file: fileInfo,
-      line: errorState ? safeParseInt(errorState, 0) : 0, // Use error state as line if numeric
+      line: errorState ? safeParseInt(errorState, 0) : 0 // Use error state as line if numeric
     };
 
     errors.push(apigeeError);
@@ -380,25 +356,25 @@ function generateErrors(responseBody, statusCode) {
 
   // If no Apigee fault but HTTP error status, create HTTP error
   if (statusCode >= 400) {
-    var errorMessage = "HTTP Error " + statusCode;
+    var errorMessage = 'HTTP Error ' + statusCode;
 
     // Extract error message from response body
-    if (responseBody && typeof responseBody === "object") {
+    if (responseBody && typeof responseBody === 'object') {
       if (responseBody.message) {
         errorMessage = responseBody.message;
       } else if (responseBody.error) {
         errorMessage = responseBody.error;
       }
-    } else if (responseBody && typeof responseBody === "string") {
+    } else if (responseBody && typeof responseBody === 'string') {
       errorMessage = responseBody.substring(0, 200);
     }
 
     var httpError = {
-      source: "onError",
-      type: "API Request failure",
+      source: 'onError',
+      type: 'API Request failure',
       message: errorMessage,
-      file: "http-response",
-      line: 0,
+      file: 'http-response',
+      line: 0
     };
 
     errors.push(httpError);
@@ -416,26 +392,23 @@ function parseBody(content, headers) {
   if (!content) {
     return {
       body: {},
-      transferEncoding: undefined,
+      transferEncoding: undefined
     };
   }
 
-  var contentType = getHeader(headers, "Content-Type") || "";
-  var isJSON = contentType.indexOf("json") > -1;
+  var contentType = getHeader(headers, 'Content-Type') || '';
+  var isJSON = contentType.indexOf('json') > -1;
 
   // Check payload size limit first
   if (isPayloadOversized(content)) {
     return {
       body: {
         message: "Payload exceeds 2MB limit and has been truncated",
-        original_size:
-          typeof content === "string"
-            ? content.length
-            : JSON.stringify(content).length,
+        original_size: (typeof content === 'string') ? content.length : JSON.stringify(content).length,
         limit_size: maxPayloadSize,
-        content_type: contentType || "unknown",
+        content_type: contentType || 'unknown'
       },
-      transferEncoding: undefined,
+      transferEncoding: undefined
     };
   }
 
@@ -445,19 +418,19 @@ function parseBody(content, headers) {
       var maskedBody = maskSensitiveData(parsedBody);
       return {
         body: maskedBody,
-        transferEncoding: undefined,
+        transferEncoding: undefined
       };
     } catch (e) {
       return {
         body: {},
-        transferEncoding: undefined,
+        transferEncoding: undefined
       };
     }
   }
 
   return {
     body: {},
-    transferEncoding: undefined,
+    transferEncoding: undefined
   };
 }
 
@@ -467,24 +440,22 @@ function parseBody(content, headers) {
  * Extracts and validates request data
  */
 function getRequestData() {
-  var req = typeof request !== "undefined" && request ? request : {};
+  var req = (typeof request !== 'undefined' && request) ? request : {};
   var headers = req.headers || {};
   var parsedBody = parseBody(req.content, headers);
 
   // Extract query parameters from the URL
-  var url = cachedProxyURL || "";
+  var url = cachedProxyURL || '';
   var queryParams = {};
-  if (url.indexOf("?") > -1) {
-    var queryString = url.split("?")[1];
+  if (url.indexOf('?') > -1) {
+    var queryString = url.split('?')[1];
     if (queryString) {
-      var pairs = queryString.split("&");
+      var pairs = queryString.split('&');
       for (var i = 0; i < pairs.length; i++) {
-        var pair = pairs[i].split("=");
+        var pair = pairs[i].split('=');
         if (pair.length === 2) {
           try {
-            queryParams[decodeURIComponent(pair[0])] = decodeURIComponent(
-              pair[1],
-            );
+            queryParams[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
           } catch (e) {
             // Skip malformed URL components
             queryParams[pair[0]] = pair[1];
@@ -495,15 +466,15 @@ function getRequestData() {
   }
 
   return {
-    timestamp: "", // Will be set by getTimestamps()
+    timestamp: '', // Will be set by getTimestamps()
     ip: getClientIP(),
     url: url,
-    user_agent: getHeader(headers, "User-Agent") || "",
-    method: (req.method || "GET").toUpperCase(),
+    user_agent: getHeader(headers, 'User-Agent') || '',
+    method: (req.method || 'GET').toUpperCase(),
     headers: getAllHeaders(headers),
     body: parsedBody.body,
     route_path: cachedPathSuffix,
-    query: queryParams,
+    query: queryParams
   };
 }
 
@@ -511,7 +482,7 @@ function getRequestData() {
  * Extracts and validates response data
  */
 function getResponseData() {
-  var res = typeof response !== "undefined" && response ? response : {};
+  var res = (typeof response !== 'undefined' && response) ? response : {};
   var headers = res.headers || {};
   var parsedBody = parseBody(res.content, headers);
   var statusCode = res.status ? safeParseInt(res.status.code, 0) : 0;
@@ -519,15 +490,11 @@ function getResponseData() {
   return {
     headers: getAllHeaders(headers),
     code: statusCode,
-    size: getHeader(headers, "Content-Length")
-      ? safeParseInt(getHeader(headers, "Content-Length"), 0)
-      : res.content
-        ? res.content.length
-        : 0,
+    size: getHeader(headers, 'Content-Length') ? safeParseInt(getHeader(headers, 'Content-Length'), 0) : (res.content ? res.content.length : 0),
     load_time: 0, // Will be set by getTimestamps()
     body: parsedBody.body,
     statusCode: statusCode, // For error generation
-    parsedBody: parsedBody.body, // For error generation
+    parsedBody: parsedBody.body // For error generation
   };
 }
 
@@ -543,17 +510,15 @@ function buildTrebllePayload() {
   // Get server info - inline since mostly static
   var serverIP = cachedSystemIP || cachedClientIP;
   var serverInfo = {
-    ip: serverIP || "bogon",
-    timezone: "UTC",
-    software: "Apigee",
-    protocol: cachedClientScheme
-      ? cachedClientScheme.toUpperCase() + "/1.1"
-      : "HTTP/1.1",
+    ip: serverIP || 'bogon',
+    timezone: 'UTC',
+    software: 'Apigee',
+    protocol: cachedClientScheme ? cachedClientScheme.toUpperCase() + '/1.1' : 'HTTP/1.1',
     os: {
-      name: "Apigee",
+      name: 'Apigee',
       release: null,
-      architecture: null,
-    },
+      architecture: null
+    }
   };
 
   // Get validated request data
@@ -569,8 +534,8 @@ function buildTrebllePayload() {
 
   // Get language info - inline since it's static
   var languageInfo = {
-    name: "Apigee",
-    version: context.getVariable("system.version") || null,
+    name: 'Apigee',
+    version: context.getVariable('system.version') || null
   };
 
   // Build final payload according to schema
@@ -588,10 +553,10 @@ function buildTrebllePayload() {
         code: responseData.code,
         size: responseData.size,
         load_time: responseData.load_time,
-        body: responseData.body,
+        body: responseData.body
       },
-      errors: errors,
-    },
+      errors: errors
+    }
   };
 
   return payload;
@@ -602,52 +567,33 @@ function buildTrebllePayload() {
 // FAIL FAST APPROACH - Exit early if anything is wrong
 
 try {
-  log("DEBUG", "Starting Treblle SDK processing");
+  log('DEBUG', 'Starting Treblle SDK processing');
 
   // VALIDATION GATE 1: Configuration - inline validation
   var configErrors = [];
-  if (
-    !sdkToken ||
-    sdkToken === null ||
-    sdkToken === undefined ||
-    sdkToken === ""
-  ) {
-    configErrors.push("SDK Token is not configured");
+  if (!sdkToken || sdkToken === null || sdkToken === undefined || sdkToken === '') {
+    configErrors.push('SDK Token is not configured');
   }
-  if (!apiKey || apiKey === null || apiKey === undefined || apiKey === "") {
-    configErrors.push("API Key is not configured");
+  if (!apiKey || apiKey === null || apiKey === undefined || apiKey === '') {
+    configErrors.push('API Key is not configured');
   }
 
   if (configErrors.length > 0) {
-    log(
-      "ERROR",
-      "Configuration invalid: " +
-      configErrors.join(", ") +
-      " - Skipping Treblle call",
-    );
-    //return; // EXIT EARLY - don't proceed with Treblle call
+    log('ERROR', 'Configuration invalid: ' + configErrors.join(', ') + ' - Skipping Treblle call');
+    // EXIT EARLY - don't proceed with Treblle call
   }
 
-  log("DEBUG", "Configuration validated successfully");
+  log('DEBUG', 'Configuration validated successfully');
 
   // VALIDATION GATE 2: Endpoint Blocking Check
   try {
     if (isEndpointBlocked(cachedPathSuffix)) {
-      log(
-        "DEBUG",
-        "Endpoint blocked from tracking: " +
-        cachedPathSuffix +
-        " - Skipping Treblle call",
-      );
-      // return; // EXIT EARLY - endpoint is blocked
+      log('DEBUG', 'Endpoint blocked from tracking: ' + cachedPathSuffix + ' - Skipping Treblle call');
+      // EXIT EARLY - endpoint is blocked
     }
-    log("DEBUG", "Endpoint allowed for tracking: " + (cachedPathSuffix || ""));
+    log('DEBUG', 'Endpoint allowed for tracking: ' + cachedPathSuffix);
   } catch (blockingError) {
-    log(
-      "ERROR",
-      "Failed to check endpoint blocking - Allowing tracking to proceed",
-      blockingError,
-    );
+    log('ERROR', 'Failed to check endpoint blocking - Allowing tracking to proceed', blockingError);
     // Don't return here - if blocking check fails, allow tracking to continue
   }
 
@@ -655,14 +601,10 @@ try {
   var trebllePayload;
   try {
     trebllePayload = buildTrebllePayload();
-    log("DEBUG", "Payload built successfully");
+    log('DEBUG', 'Payload built successfully');
   } catch (payloadError) {
-    log(
-      "ERROR",
-      "Failed to build payload - Skipping Treblle call",
-      payloadError,
-    );
-    // return; // EXIT EARLY - don't proceed with Treblle call
+    log('ERROR', 'Failed to build payload - Skipping Treblle call', payloadError);
+    // EXIT EARLY - don't proceed with Treblle call
   }
 
   // VALIDATION GATE 4: Serialize Payload
@@ -672,7 +614,7 @@ try {
     log('DEBUG', 'Payload serialized successfully - size: ' + trebllePayloadJson.length + ' bytes');
   } catch (jsonError) {
     log('ERROR', 'Failed to serialize payload - Skipping Treblle call', jsonError);
-    // return; // EXIT EARLY - don't proceed with Treblle call
+    // EXIT EARLY - don't proceed with Treblle call
   }
 
   // VALIDATION GATE 5: Host Selection
@@ -682,28 +624,22 @@ try {
     log('DEBUG', 'Selected host: ' + selectedHost);
   } catch (hostError) {
     log('ERROR', 'Failed to select host - Skipping Treblle call', hostError);
-    // return; // EXIT EARLY - don't proceed with Treblle call
+    // EXIT EARLY - don't proceed with Treblle call
   }
 
   // ALL VALIDATIONS PASSED - Set context variables for ServiceCallout
-  if (trebllePayloadJson) {
-    context.setVariable('treblle.payload.json', trebllePayloadJson);
-    context.setVariable('treblle.content.type', 'application/json');
-    context.setVariable('treblle.api.key', sdkToken);
-    context.setVariable('treblle.user.agent', 'Apigee-plugin-treblle');
-    context.setVariable('treblle.selected.host', selectedHost);
-    log("DEBUG", "All validations passed - Treblle call prepared successfully");
-  } else {
-    log("ERROR", "No payload JSON available - Skipping Treblle call");
-  }
+  context.setVariable('treblle.payload.json', trebllePayloadJson);
+  context.setVariable('treblle.content.type', 'application/json');
+  context.setVariable('treblle.api.key', sdkToken);
+  context.setVariable('treblle.user.agent', 'Apigee-plugin-treblle');
+  context.setVariable('treblle.selected.host', selectedHost);
+
+  log('DEBUG', 'All validations passed - Treblle call prepared successfully');
+
 } catch (mainError) {
   // Ultimate safety net - never crash the host API
-  log(
-    "ERROR",
-    "Critical error in Treblle SDK - Skipping Treblle call",
-    mainError,
-  );
+  log('ERROR', 'Critical error in Treblle SDK - Skipping Treblle call', mainError);
   // Just exit gracefully, don't set any context variables
 }
 
-log("DEBUG", "Treblle SDK processing completed");
+log('DEBUG', 'Treblle SDK processing completed');
