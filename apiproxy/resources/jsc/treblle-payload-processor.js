@@ -74,7 +74,7 @@ function isEndpointBlocked(path) {
     // Handle wildcard patterns
     if (blockedPattern.indexOf('*') > -1) {
       // Convert wildcard pattern to regex-like matching
-      var patternPrefix = blockedPattern.replace('*', '');
+      var patternPrefix = blockedPattern.replace(/\*/g, '');
       if (normalizedPath.indexOf(patternPrefix) === 0) {
         return true; // Path starts with the pattern prefix
       }
