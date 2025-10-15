@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ServiceCallout continueOnError="true" enabled="true" name="SC-Call-Treblle">
+    <DisplayName>Call Treblle API</DisplayName>
+    <Request clearPayload="true">
+        <Set>
+            <Headers>
+                <Header name="Content-Type">application/json</Header>
+                <Header name="Accept-Encoding">gzip, deflate</Header>
+                <Header name="x-api-key">{treblle.api.key}</Header>
+                <Header name="User-Agent">{treblle.user.agent}</Header>
+            </Headers>
+            <Payload contentType="application/json">{treblle.payload.json}</Payload>
+            <Verb>POST</Verb>
+        </Set>
+    </Request>
+    <Response>treblle_response</Response>
+    <HTTPTargetConnection>
+        <URL>https://{treblle.selected.host}</URL>
+        <ConnectionTimeoutInSeconds>3</ConnectionTimeoutInSeconds>
+        <IoTimeoutInSeconds>7</IoTimeoutInSeconds>
+        <Properties>
+            <Property name="use.proxy.pool">true</Property>
+            <Property name="max.pool.size">15</Property>
+            <Property name="keep-alive.timeout.millis">45000</Property>
+        </Properties>
+    </HTTPTargetConnection>
+</ServiceCallout>

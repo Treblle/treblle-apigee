@@ -1,175 +1,371 @@
-# Treblle Apigee Policy
+# Treblle - API Intelligence Platform
 
-This repository contains a custom Apigee policy to automatically send API request and response data to your [Treblle](https://treblle.com/) project. It helps you monitor, debug, and observe your APIs with ease.
+[![Treblle API Intelligence](https://github.com/user-attachments/assets/b268ae9e-7c8a-4ade-95da-b4ac6fce6eea)](https://treblle.com)
 
-## Overview
+[Website](http://treblle.com/) • [Documentation](https://docs.treblle.com/) • [Pricing](https://treblle.com/pricing)
 
-The policy captures detailed information about each API transaction processed by your Apigee proxy. This includes request and response headers, bodies, server information, load times, and errors. The collected data is then securely sent to your Treblle project for real-time analysis and visualization.
+Treblle is an API intelligence platfom that helps developers, teams and organizations understand their APIs from a single integration point.
 
-This implementation is designed to be non-blocking. It collects data during the response flow and sends it asynchronously to Treblle, ensuring that it does not add latency to the responses sent to your clients.
+---
 
-## Features
+## Treblle Apigee SDK
+The Treblle Apigee SDK brings native support to Google Apigee API Gateway across all Apigee versions. The SDK captures data in real-time with zero-latency and sends that data to Treblle for processing. 
 
-- **Easy Integration**: Simple to add to any Apigee API proxy.
-- **Asynchronous Logging**: Uses a Shared Flow with Service Callouts in the PostFlow to avoid impacting client response times.
-- **Configurable**: Easily set your Treblle API Key and Project ID.
-- **Data Masking**: Automatically masks sensitive information (e.g., passwords, credit cards) in request/response bodies to protect privacy. You can customize the masking keywords by editing the `maskingKeywords` variable in `treblle-apigee-policy.js` (comma-separated list).
-- **Detailed Error Reporting**: Captures Apigee fault variables and HTTP error states automatically.
-- **Robust and Safe**: Includes validation and error handling to prevent policy failures.
+## Supported Apigee Versions
 
-## Components
+| Framework | Supported Versions | Status |
+|-------------------|-------------------|---------------------|
+| **Apigee Edge** | All Versions| ✅ Full Support|
+| **Apigee X** | All Versions | ✅ Full Support |
+| **Apigee Hybrid** | All Versions | ✅ Full Support |
 
-1. **`treblle-apigee-policy.js`**: A JavaScript policy that:
+### Required Permissions
+- **API Proxy Developer**: To deploy policies and resources
+- **Environment Admin**: To create and manage Key Value Maps
+- **Shared Flow Developer**: To create the async logging flow
 
-   - Collects request, response, server, and error data.
-   - Formats the data into the JSON payload expected by the Treblle API.
-   - Masks sensitive data in request/response bodies based on configurable keywords.
-   - Stores the payload and required HTTP headers into Apigee context variables.
-   - Randomly selects primary and fallback Treblle hosts for load balancing and failover.
+### Network Requirements
+- Outbound HTTPS access to Treblle endpoints:
+  - `rocknrolla.treblle.com`
+  - `punisher.treblle.com`
+  - `sicario.treblle.com`
+- Ports: 443 (HTTPS)
 
-2. **`KVM-Treblle.xml`**: A Key Value Map Operations policy that retrieves the Treblle API key and project ID from an environment-scoped KVM.
+## Installation
 
-3. **`SC-Call-Treblle-Primary.xml`**: A Service Callout policy that makes an asynchronous HTTP POST request to the primary Treblle endpoint.
+### Step 1: Get Your Treblle Credentials
 
-4. **`SC-Call-Treblle-Fallback.xml`**: A Service Callout policy that makes an asynchronous HTTP POST request to the fallback Treblle endpoint, triggered only if the primary callout fails.
+1. Sign up for a free account at [treblle.com](https://treblle.com)
+2. Create a new API in your Treblle dashboard
+3. Copy your **SDK Token** and **API Key** from the project settings
 
-## Installation and Configuration
+### Step 2: Create Environment Configuration
 
-Follow these steps to integrate the Treblle policy into your Apigee API proxy:
+#### Option A: Using Apigee Management API (Recommended)
 
-### 1. Create a Key Value Map (KVM)
-
-First, create an environment-scoped KVM to store your Treblle credentials securely. You can do this via the Apigee UI or API.
-
-**Via API (recommended for automation):**
-
-Replace `YOUR_ORGANIZATION`, `YOUR_ENVIRONMENT`, and choose a KVM name (e.g., `treblle-kvm`):
+Replace the placeholders with your actual values:
+- `YOUR_ORGANIZATION`: Your Apigee organization name
+- `YOUR_ENVIRONMENT`: Target environment (test, prod, etc.)
+- `YOUR_TREBLLE_SDK_TOKEN`: From your Treblle project
+- `YOUR_TREBLLE_API_KEY`: From your Treblle project
 
 ```bash
+# Create the KVM
 curl -X POST "https://apigee.googleapis.com/v1/organizations/YOUR_ORGANIZATION/environments/YOUR_ENVIRONMENT/keyvaluemaps" \
--H "Authorization: Bearer $(gcloud auth print-access-token)" \
--H "Content-Type: application/json" \
--d '{
-  "name": "treblle-kvm",
-  "encrypted": true
-}'
-```
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "treblle-kvm",
+    "encrypted": true
+  }'
 
-### 2. Populate the KVM with Treblle Credentials
-
-Add your Treblle API key and project ID to the KVM:
-
-```bash
+# Add SDK Token
 curl -X POST "https://apigee.googleapis.com/v1/organizations/YOUR_ORGANIZATION/environments/YOUR_ENVIRONMENT/keyvaluemaps/treblle-kvm/entries" \
--H "Authorization: Bearer $(gcloud auth print-access-token)" \
--H "Content-Type: application/json" \
--d '{ "name": "treblle_api_key", "value": "YOUR_TREBLLE_API_KEY" }'
-```
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "treblle_sdk_token",
+    "value": "YOUR_TREBLLE_SDK_TOKEN"
+  }'
 
-```bash
+# Add API Key
 curl -X POST "https://apigee.googleapis.com/v1/organizations/YOUR_ORGANIZATION/environments/YOUR_ENVIRONMENT/keyvaluemaps/treblle-kvm/entries" \
--H "Authorization: Bearer $(gcloud auth print-access-token)" \
--H "Content-Type: application/json" \
--d '{ "name": "treblle_project_id", "value": "YOUR_TREBLLE_PROJECT_ID" }'
-```
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "treblle_api_key", 
+    "value": "YOUR_TREBLLE_API_KEY"
+  }'
 
-**Verify the entries:**
-
-```bash
+# Verify the setup
 curl "https://apigee.googleapis.com/v1/organizations/YOUR_ORGANIZATION/environments/YOUR_ENVIRONMENT/keyvaluemaps/treblle-kvm/entries" \
--H "Authorization: Bearer $(gcloud auth print-access-token)"
+  -H "Authorization: Bearer $(gcloud auth print-access-token)"
 ```
 
-### 3. Upload Policies to Apigee
+#### Option B: Using Apigee UI
 
-1. Upload `treblle-apigee-policy.js` as a new JavaScript resource in your Apigee proxy API.
-2. Create the policies by pasting the content of the XML files into new policies in your API proxy or shared flow.
+1. Navigate to **Admin > Environments > Key Value Maps**
+2. Click **+ Key Value Map**
+3. Name: `treblle-kvm`
+4. Enable **Encrypted** checkbox
+5. Click **Create**
+6. Add entries:
+   - Key: `treblle_sdk_token`, Value: `YOUR_TREBLLE_SDK_TOKEN`
+   - Key: `treblle_api_key`, Value: `YOUR_TREBLLE_API_KEY`
 
-### 4. Create a Shared Flow
+### Step 3: Deploy the Shared Flow
 
-Create a new Shared Flow in Apigee and add the following steps:
+1. In Apigee UI, go to **Develop > Shared Flows**
+2. Click **+ Shared Flow**
+3. Name: `treblle-logger`
+4. Upload or copy the content from `sharedflows/policies/SC-SendToTreblle.xml`
+5. Deploy to your target environment
 
-- Add `SC-Call-Treblle-Primary` as the first step.
-- Add `SC-Call-Treblle-Fallback` as the second step with the condition: `servicecallout.SC-Call-Treblle-Primary.failed = "true"`
-
-The Shared Flow XML should look like this:
-
+**Shared Flow XML:**
 ```xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<SharedFlow name="default">
+<SharedFlow name="treblle-logger">
   <Step>
-    <Name>SC-Call-Treblle-Primary</Name>
-  </Step>
-  <Step>
-    <Name>SC-Call-Treblle-Fallback</Name>
-    <Condition>servicecallout.SC-Call-Treblle-Primary.failed = "true"</Condition>
+    <Name>SC-SendToTreblle</Name>
   </Step>
 </SharedFlow>
 ```
 
-### 5. Attach Policies to the API Proxy Flow
+### Step 4: Configure Your API Proxy
 
-To ensure the policy captures the full request and response cycle without adding latency, attach the policies as follows:
+#### Upload Resources
+1. Go to **Develop > API Proxies > [Your Proxy]**
+2. Navigate to **Resources > JavaScript**
+3. Click **+ Resource**
+4. Upload `treblle-payload-processor.js`
 
-1. **Attach the JavaScript Policy**:
+#### Create Policies
+1. Go to **Policies**
+2. Create **JavaScript Policy**:
+   - Name: `JS-ProcessTrebllePayload`
+   - Resource: `treblle-payload-processor.js`
+3. Create **Key Value Map Policy**:
+   - Name: `KVM-GetTreblleCredentials`  
+   - Copy content from `KVM-GetTreblleCredentials.xml`
+   - Update `mapIdentifier` to `treblle-kvm`
+4. Create **Flow Callout Policy**:
+   - Name: `FC-TreblleAsyncLogger`
+   - Shared Flow: `treblle-logger`
 
-   - Go to the `Develop` tab of your API proxy.
-   - Select the **PreFlow** of the **Proxy Endpoint** section.
-   - Add a new **JavaScript** policy to the **Response** flow.
-   - Select the `treblle-apigee-policy.js` script you uploaded.
-   - Name the policy `JS-treblle`.
+#### Attach to Flow
 
-2. **Attach the KVM Policy**:
-
-   - In the **PostFlow** of the **Proxy Endpoint** section.
-   - Add the **Key Value Map Operations** policy (`KVM-Treblle`) to the **Request** flow.
-   - Update the `mapIdentifier` in `KVM-Treblle.xml` to match your KVM name (e.g., `treblle-kvm`).
-   - Name the policy `KVM-Treblle`.
-
-3. **Attach the Flow Call Policy**:
-   - In the **PostFlow** of the **Proxy Endpoint** section.
-   - Add a **Flow Call** policy to the **Response** flow.
-   - Configure it to call the Shared Flow you created.
-   - Name the policy `FC-Async-Treblle-Logger`.
-
-Your Proxy Endpoint flow should look like this:
-
+**PreFlow Response (Required):**
 ```xml
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<ProxyEndpoint name="default">
-  <Description/>
-  <FaultRules/>
-  <PreFlow name="PreFlow">
-    <Request/>
-    <Response>
-      <Step>
-        <Name>JS-treblle</Name>
-      </Step>
-    </Response>
-  </PreFlow>
-  <PostFlow name="PostFlow">
-    <Request>
-      <Step>
-        <Name>KVM-Treblle</Name>
-      </Step>
-    </Request>
-    <Response>
-      <Step>
-        <Name>FC-Async-Treblle-Logger</Name>
-      </Step>
-    </Response>
-  </PostFlow>
-  <Flows/>
-  <HTTPProxyConnection>
-    <BasePath>/treblle-demo</BasePath>
-    <Properties/>
-  </HTTPProxyConnection>
-  <RouteRule name="default">
-    <TargetEndpoint>default</TargetEndpoint>
-  </RouteRule>
-</ProxyEndpoint>
+<Response>
+  <Step>
+    <Name>JS-ProcessTrebllePayload</Name>
+  </Step>
+</Response>
 ```
 
-### 6. Save and Deploy
+**PostFlow Request (Required):**
+```xml
+<Request>
+  <Step>
+    <Name>KVM-GetTreblleCredentials</Name>
+  </Step>
+</Request>
+```
 
-Save the changes to your API proxy and Shared Flow, then deploy the new revision. Your API traffic will now be monitored by Treblle.
+**PostFlow Response (Required):**
+```xml
+<Response>
+  <Step>
+    <Name>FC-TreblleAsyncLogger</Name>
+  </Step>
+</Response>
+```
+
+## Configuration
+
+### Data Masking
+
+Customize sensitive data detection by modifying the `maskingKeywords` variable:
+
+```javascript
+// Default masking keywords
+var maskingKeywords = 'password,secret,token,key,authorization,auth,credential,private,confidential,ssn,social_security,credit_card,card_number,cvv,pin,api_key,access_token,refresh_token,bearer,x-api-key,x-auth-token';
+
+// Add your custom keywords
+var maskingKeywords = 'password,secret,token,key,authorization,auth,credential,private,confidential,ssn,social_security,credit_card,card_number,cvv,pin,api_key,access_token,refresh_token,bearer,x-api-key,x-auth-token,customer_id,user_id,email,phone';
+```
+
+**Masking Behavior:**
+- Preserves original string length
+- Replaces all characters with `*`
+- Works in request/response bodies and headers
+- Case-insensitive matching
+- Supports nested JSON objects and arrays
+
+### Endpoint Blocking  
+
+Block specific endpoints from being tracked:
+
+```javascript
+// Basic blocking
+var blockedEndpoints = 'health,status,ping';
+
+// Wildcard patterns
+var blockedEndpoints = 'health,status,ping,admin/*,internal/*,v1/auth/*';
+
+// Complex patterns
+var blockedEndpoints = 'health,status,ping,admin/*,internal/*,*/private/*,test-*';
+```
+
+**Wildcard Support:**
+- `admin/*` - Blocks all paths starting with `admin/`
+- `*/private/*` - Blocks any path containing `/private/`  
+- `test-*` - Blocks paths starting with `test-`
+
+### Debug Mode
+
+Enable detailed logging for troubleshooting:
+
+```javascript
+var debugMode = true;  // Enable debug logging
+```
+
+**Debug Output Includes:**
+- Configuration validation results
+- Payload building process
+- Endpoint blocking decisions
+- Error details and stack traces
+- Performance timing information
+
+### Environment-Specific Configuration
+
+Use different KVM names for different environments:
+
+**Development:**
+```xml
+<KeyValueMapOperations mapIdentifier="treblle-kvm-dev">
+```
+
+**Production:**
+```xml
+<KeyValueMapOperations mapIdentifier="treblle-kvm-prod">
+```
+
+## Architecture Overview
+
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   API Request   │───▶│  Apigee Proxy   │───▶│  Backend API    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │ JS-ProcessPayload│ (PreFlow Response)
+                       └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │KVM-GetCredentials│ (PostFlow Request)  
+                       └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │ FC-AsyncLogger  │ (PostFlow Response)
+                       └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │ Shared Flow     │
+                       │ SC-SendToTreblle│
+                       └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │ Treblle API     │
+                       │ (Load Balanced) │
+                       └─────────────────┘
+```
+
+### Flow Execution Order
+
+1. **PreFlow Response**: JavaScript policy captures request/response data
+2. **PostFlow Request**: KVM policy retrieves credentials  
+3. **PostFlow Response**: Flow Callout triggers async Shared Flow
+4. **Shared Flow**: Service Callout sends data to Treblle
+5. **Client Response**: Continues normally (no latency impact)
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### 1. No Data in Treblle Dashboard
+
+**Symptoms**: API calls work but no data appears in Treblle
+
+**Solutions**:
+```bash
+# Check KVM configuration
+curl "https://apigee.googleapis.com/v1/organizations/YOUR_ORG/environments/YOUR_ENV/keyvaluemaps/treblle-kvm/entries" \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)"
+
+# Enable debug mode
+var debugMode = true;  // In treblle-payload-processor.js
+
+# Check Apigee logs for errors
+# Look for "Treblle" in the trace logs
+```
+
+#### 2. Policy Execution Errors  
+
+**Symptoms**: 500 errors or policy failures
+
+**Solutions**:
+```javascript
+// Check policy attachment order in proxy XML
+// PreFlow Response: JS-ProcessTrebllePayload
+// PostFlow Request: KVM-GetTreblleCredentials  
+// PostFlow Response: FC-TreblleAsyncLogger
+
+// Verify JavaScript resource upload
+// Ensure all variable names match exactly
+```
+
+#### 3. Credential Issues
+
+**Symptoms**: Authentication errors in logs
+
+**Solutions**:
+```bash
+# Verify credential format (no extra spaces/characters)
+# Test credentials manually:
+curl -X POST "https://rocknrolla.treblle.com" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_SDK_TOKEN" \
+  -d '{"test": true}'
+```
+
+#### 4. Performance Issues
+
+**Symptoms**: Increased API latency
+
+**Solutions**:
+```javascript
+// Reduce payload size limit
+var maxPayloadSize = 524288;  // 512KB instead of 2MB
+
+// Disable body logging temporarily  
+var logBody = false;
+
+// Check blocked endpoints
+var debugMode = true;  // See what's being processed
+```
+
+### Debug Mode Output
+
+Enable debug logging to see detailed execution:
+
+```javascript
+var debugMode = true;
+```
+
+**Sample Debug Output**:
+```
+DEBUG: Starting Treblle SDK processing
+DEBUG: Configuration validated successfully  
+DEBUG: Endpoint allowed for tracking: /api/users
+DEBUG: Payload built successfully
+DEBUG: Payload serialized successfully - size: 1337 bytes
+DEBUG: Selected host: rocknrolla.treblle.com
+DEBUG: All validations passed - Treblle call prepared successfully
+DEBUG: Treblle SDK processing completed
+```
+
+## Support
+
+If you have problems of any kind feel free to reach out via <https://treblle.com> or email support@treblle.com and we'll do our best to help you out.
+
+## License
+
+Copyright 2025, Treblle Inc. Licensed under the MIT license:
+http://www.opensource.org/licenses/mit-license.php
